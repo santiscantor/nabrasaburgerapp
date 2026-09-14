@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Na Brasa Burguer - Painel ADM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Rubik:wght@400;500;600;700&display=swap">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; }
+  * { box-sizing: border-box; }
+  button { font-family: "Rubik", sans-serif; cursor: pointer; border: none; background: none; }
+  input, textarea, select { font-family: "Rubik", sans-serif; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+// TROQUE pelo firebaseConfig do SEU projeto (o mesmo usado nos outros 2 apps)
+const firebaseConfig = {
+  apiKey: "AIzaSyAdKqYdj6JuUlcYuhqG5FBi-uf9mX7g3Mk",
+  authDomain: "na-brasa-app-1f04b.firebaseapp.com",
+  projectId: "na-brasa-app-1f04b",
+  storageBucket: "na-brasa-app-1f04b.firebasestorage.app",
+  messagingSenderId: "1084945591864",
+  appId: "1:1084945591864:web:63ce98f1285185b52c00cd",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Login simples do admin — troque essa senha! (isso é só uma trava básica de tela)
+const ADMIN_USER = "admin";
+const ADMIN_PASS = "brasa2026";
+</script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo } = React;
+
+function makeIcon(symbol) {
+  return function IconCmp({ size = 16, color = "currentColor", style }) {
+    return <span style={{ fontSize: size, lineHeight: 1, color, display: "inline-flex", alignItems: "center", justifyContent: "center", width: size, height: size, ...style }}>{symbol}</span>;
+  };
+}
+const Flame = makeIcon("\uD83D\uDD25");
+const ShoppingCart = makeIcon("\uD83D\uDED2");
+const MapPin = makeIcon("\uD83D\uDCCD");
+const CreditCard = makeIcon("\uD83D\uDCB3");
+const Banknote = makeIcon("\uD83D\uDCB5");
+const QrCode = makeIcon("\u25A6");
+const Star = makeIcon("\u2605");
+const Plus = makeIcon("+");
+const Minus = makeIcon("\u2212");
+const ChevronLeft = makeIcon("\u2039");
+const Check = makeIcon("\u2713");
+const Clock = makeIcon("\uD83D\uDD50");
+const Home = makeIcon("\uD83C\uDFE0");
+const UtensilsCrossed = makeIcon("\uD83C\uDF74");
+const User = makeIcon("\uD83D\uDC64");
+const Trophy = makeIcon("\uD83C\uDFC6");
+const X = makeIcon("\u2715");
+const RotateCcw = makeIcon("\u21BA");
+const Lock = makeIcon("\uD83D\uDD12");
+const LogOut = makeIcon("\u23CF");
+const Printer = makeIcon("\uD83D\uDDA8");
+const Send = makeIcon("\u27A4");
+const ClipboardList = makeIcon("\uD83D\uDCCB");
+const Users = makeIcon("\uD83D\uDC65");
+const Tag = makeIcon("\uD83C\uDFF7");
+const Gift = makeIcon("\uD83C\uDF81");
+const Grid3x3 = makeIcon("\u25A6");
+const Wallet = makeIcon("\uD83D\uDCB0");
+const ShoppingBag = makeIcon("\uD83D\uDECD");
+const UserCog = makeIcon("\uD83D\uDC64");
+const Trash2 = makeIcon("\uD83D\uDDD1");
+const Search = makeIcon("\uD83D\uDD0D");
+const LayoutGrid = makeIcon("\u25A6");
+const UserIcon = User;
+
+
+function money(v) { return (v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
+
+const DEFAULT_MENU = [
+  { id: "l1", category: "Lanches", name: "01 - Kids", desc: "Pão de hambúrguer, blend costela 130g, queijo e molhos", price: 18.0, available: true },
+  { id: "l2", category: "Lanches", name: "02 - Salada", desc: "+ queijo, cebola roxa, alface, tomate e molhos", price: 21.0, available: true },
+  { id: "l3", category: "Lanches", name: "03 - Egg", desc: "+ ovo, queijo, cebola roxa, alface, tomate e molhos", price: 24.0, available: true },
+  { id: "l4", category: "Lanches", name: "04 - Bacon", desc: "+ queijo, bacon, cebola roxa, alface, tomate e molhos", price: 26.0, available: true },
+  { id: "l5", category: "Lanches", name: "05 - Big", desc: "+ queijo, bacon, frango, calabresa, cebola roxa, alface, tomate e molhos", price: 28.0, available: true },
+  { id: "p1", category: "Porções", name: "Batata Palito", desc: "Porção 200g", price: 12.0, available: true },
+  { id: "p2", category: "Porções", name: "Batata Grande", desc: "500g, com cheddar e bacon", price: 38.0, available: true },
+  { id: "b1", category: "Bebidas", name: "Coca-Cola Lata", desc: "350ml", price: 7.0, available: true },
+  { id: "b2", category: "Bebidas", name: "Coca-Cola Zero Lata", desc: "350ml", price: 7.0, available: true },
+  { id: "b3", category: "Bebidas", name: "Fanta Laranja Lata", desc: "350ml", price: 7.0, available: true },
+  { id: "b4", category: "Bebidas", name: "Água", desc: "500ml", price: 4.0, available: true },
+  { id: "b5", category: "Bebidas", name: "Água com Gás", desc: "500ml", price: 4.0, available: true },
+];
+
+const ADDONS = [
+  { id: "a1", name: "Bacon", price: 6.0 },
+  { id: "a2", name: "Ovo", price: 3.0 },
+  { id: "a3", name: "Queijo", price: 2.0 },
+  { id: "a4", name: "Carne", price: 10.0 },
+];
+
+const BAIRROS_TAXA_3 = [
+  "Centro", "Bela Vista", "Altos de Ipeúna", "Jardim dos Ipês", "Jardim das Palmeiras",
+  "Jardim das Orquídeas", "Jardim Primavera", "Jardim Nova Ipeúna", "Vila Aparecida",
+  "Residencial dos Cambarás", "Residencial Zilda Scaglia Dorta",
+  "Mini Distrito Industrial I", "Mini Distrito Industrial II", "Mini Distrito Industrial III",
+];
+const NEIGHBORHOODS = [...BAIRROS_TAXA_3.map((name) => ({ name, fee: 3.0 })), { name: "Portal dos Nobres", fee: 6.0 }];
+const PAYMENT_METHODS = [{ id: "pix", label: "Pix" }, { id: "cartao", label: "Cartão" }, { id: "dinheiro", label: "Dinheiro" }];
+const STATUS_FLOW = ["Recebido", "Em preparo", "Saiu para entrega", "Entregue"];
+const TOTAL_MESAS = 20;
+
+function addonsById(ids) { return ids.map((id) => ADDONS.find((a) => a.id === id)).filter(Boolean); }
+function unitPrice(item, addonIds) { return (item ? item.price : 0) + addonsById(addonIds).reduce((s, a) => s + a.price, 0); }
+function lineKey(itemId, addonIds, notes) { return itemId + "|" + [...addonIds].sort().join(",") + "|" + notes.trim().toLowerCase(); }
+function nowHora() { const d = new Date(); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+function mesaInicial(id) { return { id, status: "livre", clienteNome: "", garcom: null, cart: [], enviados: [] }; }
+
+async function seedProductsIfEmpty() {
+  const snap = await db.collection("products").limit(1).get();
+  if (snap.empty) {
+    const batch = db.batch();
+    DEFAULT_MENU.forEach((item) => batch.set(db.collection("products").doc(item.id), item));
+    await batch.commit();
+  }
+}
+async function seedTablesIfEmpty() {
+  const snap = await db.collection("tables").limit(1).get();
+  if (snap.empty) {
+    const batch = db.batch();
+    for (let i = 1; i <= TOTAL_MESAS; i++) batch.set(db.collection("tables").doc(String(i)), mesaInicial(i));
+    await batch.commit();
+  }
+}
+async function seedConfigIfEmpty() {
+  const promoDoc = await db.collection("config").doc("promo").get();
+  if (!promoDoc.exists) await db.collection("config").doc("promo").set({ name: "05 - Big + Batata Palito", price: 36.9, imageUrl: "" });
+  const loyaltyDoc = await db.collection("config").doc("loyalty").get();
+  if (!loyaltyDoc.exists) await db.collection("config").doc("loyalty").set({ pontosPorReal: 1, pontosParaBrinde: 500, nomeBrinde: "1 lanche grátis" });
+}
+async function seedStaffIfEmpty() {
+  const snap = await db.collection("staff").limit(1).get();
+  if (snap.empty) {
+    const defaults = [
+      { user: "joao", pass: "1234", nome: "João" },
+      { user: "maria", pass: "1234", nome: "Maria" },
+      { user: "pedro", pass: "1234", nome: "Pedro" },
+      { user: "ana", pass: "1234", nome: "Ana" },
+      { user: "lucas", pass: "1234", nome: "Lucas" },
+    ];
+    const batch = db.batch();
+    defaults.forEach((w) => batch.set(db.collection("staff").doc(w.user), { ...w, ativo: true }));
+    await batch.commit();
+  }
+}
+
+function App() {
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [tab, setTab] = useState("pedidos");
+  const [orders, setOrders] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [promo, setPromo] = useState({ name: "", price: 0, imageUrl: "" });
+  const [loyalty, setLoyalty] = useState({ pontosPorReal: 1, pontosParaBrinde: 500, nomeBrinde: "" });
+  const [produtos, setProdutos] = useState([]);
+  const [mesas, setMesas] = useState([]);
+  const [transacoes, setTransacoes] = useState([]);
+  const [staff, setStaff] = useState([]);
+
+  useEffect(() => { if (loggedIn) { seedProductsIfEmpty(); seedTablesIfEmpty(); seedConfigIfEmpty(); seedStaffIfEmpty(); } }, [loggedIn]);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    const u1 = db.collection("orders").orderBy("createdAt", "desc").onSnapshot((snap) => setOrders(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const u2 = db.collection("customers").onSnapshot((snap) => setCustomers(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const u3 = db.collection("config").doc("promo").onSnapshot((d) => { if (d.exists) setPromo(d.data()); });
+    const u4 = db.collection("config").doc("loyalty").onSnapshot((d) => { if (d.exists) setLoyalty(d.data()); });
+    const u5 = db.collection("products").onSnapshot((snap) => setProdutos(snap.docs.map((d) => d.data())));
+    const u6 = db.collection("tables").orderBy(firebase.firestore.FieldPath.documentId()).onSnapshot((snap) => setMesas(snap.docs.map((d) => ({ id: parseInt(d.id, 10), ...d.data() }))));
+    const u7 = db.collection("transactions").orderBy("createdAt", "desc").limit(50).onSnapshot((snap) => setTransacoes(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const u8 = db.collection("staff").onSnapshot((snap) => setStaff(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); };
+  }, [loggedIn]);
+
+  const allItems = useMemo(() => produtos.reduce((acc, i) => ({ ...acc, [i.id]: i }), {}), [produtos]);
+  const menuByCategory = useMemo(() => {
+    const cats = {};
+    produtos.forEach((p) => { if (!cats[p.category]) cats[p.category] = []; cats[p.category].push(p); });
+    return cats;
+  }, [produtos]);
+
+  async function addTransacao(t) {
+    await db.collection("transactions").add({ hora: nowHora(), createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...t });
+  }
+  async function advanceStatus(orderId) {
+    const order = orders.find((o) => o.id === orderId);
+    const idx = STATUS_FLOW.indexOf(order.status);
+    await db.collection("orders").doc(orderId).update({ status: STATUS_FLOW[Math.min(idx + 1, STATUS_FLOW.length - 1)] });
+  }
+  async function markPrinted(orderId) { await db.collection("orders").doc(orderId).update({ impresso: true }); }
+  async function togglePago(orderId) {
+    const order = orders.find((o) => o.id === orderId);
+    await db.collection("orders").doc(orderId).update({ pago: !order.pago });
+  }
+  async function criarPedidoDelivery(pedido) {
+    await db.collection("orders").add({ status: "Recebido", impresso: false, pago: false, createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...pedido });
+    await addTransacao({ origem: "Balcão/WhatsApp · " + (pedido.cliente || "Cliente"), forma: pedido.formaChave, valor: pedido.total });
+  }
+  async function updateProduto(id, patch) { await db.collection("products").doc(id).update(patch); }
+  async function salvarPromo(p) { await db.collection("config").doc("promo").set(p); }
+  async function salvarLoyalty(l) { await db.collection("config").doc("loyalty").set(l); }
+  async function updateCustomerPontos(id, pontos) { await db.collection("customers").doc(id).update({ pontos }); }
+
+  async function addStaff(user, pass, nome) {
+    await db.collection("staff").doc(user.trim().toLowerCase()).set({ user: user.trim().toLowerCase(), pass, nome, ativo: true });
+  }
+  async function toggleStaffAtivo(id, atual) { await db.collection("staff").doc(id).update({ ativo: !atual }); }
+  async function removeStaff(id) { await db.collection("staff").doc(id).delete(); }
+
+  async function updateMesa(id, patch) { await db.collection("tables").doc(String(id)).set(patch, { merge: true }); }
+  async function abrirMesaAdmin(id) {
+    const mesa = mesas.find((m) => m.id === id);
+    if (mesa && mesa.status === "livre") await updateMesa(id, { status: "ocupada", garcom: "Admin" });
+  }
+  async function addLineMesa(id, itemId, addonIds, notes, qty) {
+    const mesa = mesas.find((m) => m.id === id);
+    const key = lineKey(itemId, addonIds, notes);
+    const existing = mesa.cart.find((l) => l.key === key);
+    const cart = existing ? mesa.cart.map((l) => (l.key === key ? { ...l, qty: l.qty + qty } : l)) : [...mesa.cart, { key, itemId, addonIds, notes, qty }];
+    await updateMesa(id, { cart });
+  }
+  async function enviarCozinhaMesa(id) {
+    const mesa = mesas.find((m) => m.id === id);
+    await updateMesa(id, { enviados: [...mesa.enviados, ...mesa.cart], cart: [] });
+  }
+  async function fecharMesaAdmin(id, paymentIds, troco, total) {
+    const mesa = mesas.find((m) => m.id === id);
+    await addTransacao({ origem: "Mesa " + id + (mesa.clienteNome ? " · " + mesa.clienteNome : ""), forma: paymentIds[0] || "pix", valor: total });
+    await db.collection("tables").doc(String(id)).set(mesaInicial(id));
+  }
+
+  if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />;
+
+  return (
+    <div style={styles.page}>
+      <div style={styles.shell}>
+        <Sidebar tab={tab} setTab={setTab} onLogout={() => setLoggedIn(false)} pendingCount={orders.filter((o) => o.status !== "Entregue").length} />
+        <div style={styles.content}>
+          {tab === "pedidos" && <PedidosTab orders={orders} advanceStatus={advanceStatus} markPrinted={markPrinted} togglePago={togglePago} />}
+          {tab === "novo-pedido" && <NovoPedidoTab allItems={allItems} menuByCategory={menuByCategory} onCriar={criarPedidoDelivery} />}
+          {tab === "mesas" && <MesasTab mesas={mesas} allItems={allItems} menuByCategory={menuByCategory} onAbrir={abrirMesaAdmin} onAddLine={addLineMesa} onEnviar={enviarCozinhaMesa} onFechar={fecharMesaAdmin} onUpdateMesa={updateMesa} />}
+          {tab === "clientes" && <ClientesTab customers={customers} onUpdatePontos={updateCustomerPontos} />}
+          {tab === "promocao" && <PromocaoTab promo={promo} onSalvar={salvarPromo} />}
+          {tab === "cardapio" && <CardapioTab produtos={produtos} onUpdate={updateProduto} />}
+          {tab === "fidelidade" && <FidelidadeTab loyalty={loyalty} onSalvar={salvarLoyalty} />}
+          {tab === "caixa" && <CaixaTab transacoes={transacoes} />}
+          {tab === "funcionarios" && <FuncionariosTab staff={staff} onAdd={addStaff} onToggle={toggleStaffAtivo} onRemove={removeStaff} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LoginScreen({ onLogin }) {
+  const [user, setUser] = useState("");
+  const [pass, setPass] = useState("");
+  const [error, setError] = useState("");
+  function handleLogin() {
+    if (user === ADMIN_USER && pass === ADMIN_PASS) { setError(""); onLogin(); }
+    else setError("Usuário ou senha incorretos");
+  }
+  return (
+    <div style={styles.loginPage}>
+      <div style={styles.loginCard}>
+        <div style={styles.loginLogo}><Flame size={26} color="#FFC907" /></div>
+        <h1 style={styles.loginTitle}>NA BRASA BURGUER</h1>
+        <p style={styles.loginSubtitle}>Painel do administrador</p>
+        <label style={styles.loginLabel}>Usuário</label>
+        <div style={styles.loginInputWrap}><UserIcon size={15} color="#8C7B52" /><input value={user} onChange={(e) => setUser(e.target.value)} placeholder="admin" style={styles.loginInput} /></div>
+        <label style={styles.loginLabel}>Senha</label>
+        <div style={styles.loginInputWrap}><Lock size={15} color="#8C7B52" /><input value={pass} onChange={(e) => setPass(e.target.value)} type="password" placeholder="••••••••" style={styles.loginInput} /></div>
+        {error && <p style={{ color: "#E1231B", fontSize: 11.5, margin: "0 0 8px" }}>{error}</p>}
+        <button style={styles.loginBtn} onClick={handleLogin}>ENTRAR</button>
+        <p style={styles.loginNote}>Usuário/senha padrão: admin / brasa2026 — troque no código antes de publicar de verdade.</p>
+      </div>
+    </div>
+  );
+}
+
+function Sidebar({ tab, setTab, onLogout, pendingCount }) {
+  const items = [
+    { id: "pedidos", label: "Pedidos", icon: LayoutGrid, badge: pendingCount },
+    { id: "novo-pedido", label: "Novo pedido (delivery)", icon: ShoppingBag },
+    { id: "mesas", label: "Mesas", icon: Grid3x3 },
+    { id: "clientes", label: "Clientes", icon: Users },
+    { id: "promocao", label: "Promoção do dia", icon: Tag },
+    { id: "cardapio", label: "Cardápio", icon: UtensilsCrossed },
+    { id: "fidelidade", label: "Fidelidade", icon: Gift },
+    { id: "caixa", label: "Fechamento de caixa", icon: Wallet },
+    { id: "funcionarios", label: "Funcionários (garçom)", icon: UserCog },
+  ];
+  return (
+    <div style={styles.sidebar}>
+      <div style={styles.sidebarLogo}><Flame size={18} color="#E1231B" /><span style={styles.sidebarLogoText}>NA BRASA</span></div>
+      <div style={{ flex: 1, marginTop: 20, overflowY: "auto" }}>
+        {items.map((it) => {
+          const Icon = it.icon; const active = tab === it.id;
+          return (
+            <button key={it.id} onClick={() => setTab(it.id)} style={{ ...styles.sidebarItem, ...(active ? styles.sidebarItemActive : {}) }}>
+              <Icon size={16} color={active ? "#FFC907" : "#B8A876"} /><span>{it.label}</span>
+              {it.badge ? <span style={styles.sidebarBadge}>{it.badge}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+      <button onClick={onLogout} style={styles.sidebarLogout}><LogOut size={15} color="#B8A876" /> Sair</button>
+    </div>
+  );
+}
+
+function FuncionariosTab({ staff, onAdd, onToggle, onRemove }) {
+  const [nome, setNome] = useState("");
+  const [user, setUser] = useState("");
+  const [pass, setPass] = useState("");
+  const [erro, setErro] = useState("");
+
+  function handleAdd() {
+    if (!nome.trim() || !user.trim() || !pass.trim()) { setErro("Preencha nome, usuário e senha."); return; }
+    if (staff.some((s) => s.id === user.trim().toLowerCase())) { setErro("Já existe um garçom com esse usuário."); return; }
+    onAdd(user, pass, nome);
+    setNome(""); setUser(""); setPass(""); setErro("");
+  }
+
+  return (
+    <div>
+      <TabHeader title="Funcionários (app do garçom)" subtitle="Só quem estiver aqui consegue entrar no app do garçom — esse app não tem acesso aos dados de clientes" />
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+        <div style={styles.formCard}>
+          <p style={{ margin: 0, fontWeight: 800, color: "#171310", fontSize: 13 }}>Adicionar garçom</p>
+          <label style={styles.formLabel}>Nome</label>
+          <input value={nome} onChange={(e) => setNome(e.target.value)} style={styles.formInput} placeholder="Ex: Fernanda" />
+          <label style={styles.formLabel}>Usuário (login)</label>
+          <input value={user} onChange={(e) => setUser(e.target.value)} style={styles.formInput} placeholder="Ex: fernanda" />
+          <label style={styles.formLabel}>Senha</label>
+          <input value={pass} onChange={(e) => setPass(e.target.value)} style={styles.formInput} placeholder="Defina uma senha" />
+          {erro && <p style={{ color: "#E1231B", fontSize: 11, marginTop: 6 }}>{erro}</p>}
+          <button style={{ ...styles.smallBtnPrimary, marginTop: 12 }} onClick={handleAdd}><Plus size={13} color="#FFFBEF" /> Adicionar garçom</button>
+        </div>
+
+        <div style={{ flex: "1 1 320px" }}>
+          <p style={{ fontSize: 11, letterSpacing: 0.5, fontWeight: 800, color: "#E1231B", marginBottom: 8 }}>GARÇONS CADASTRADOS</p>
+          <div style={styles.customerList}>
+            {staff.map((s) => (
+              <div key={s.id} style={styles.customerCard}>
+                <div style={styles.customerAvatar}>{s.nome.split(" ").map((p) => p[0]).slice(0, 2).join("")}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={styles.customerName}>{s.nome}</p>
+                  <p style={styles.customerMeta}>usuário: {s.user}</p>
+                </div>
+                <button onClick={() => onToggle(s.id, s.ativo)} style={{ ...styles.dispBtn, ...(s.ativo ? styles.dispBtnOn : styles.dispBtnOff) }}>{s.ativo ? "Ativo" : "Bloqueado"}</button>
+                <button onClick={() => onRemove(s.id)} style={styles.removeStaffBtn}><Trash2 size={14} color="#C0392B" /></button>
+              </div>
+            ))}
+            {staff.length === 0 && <p style={{ color: "#6B5A3A", fontSize: 13 }}>Nenhum garçom cadastrado ainda.</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TabHeader({ title, subtitle }) {
+  return (<div style={{ marginBottom: 20 }}><h2 style={styles.tabTitle}>{title}</h2><p style={styles.tabSubtitle}>{subtitle}</p></div>);
+}
+
+function PedidosTab({ orders, advanceStatus, markPrinted, togglePago }) {
+  return (
+    <div>
+      <TabHeader title="Pedidos" subtitle="Pedidos chegando em tempo real do app dos clientes e do balcão" />
+      <div style={styles.ordersGrid}>
+        {orders.map((o) => (
+          <div key={o.id} style={styles.orderCard}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div><p style={styles.orderId}>{o.id.slice(0, 6)}</p><p style={styles.orderCustomer}>{o.cliente}</p></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                <span style={styles.statusChip}>{o.status}</span>
+                <button onClick={() => togglePago(o.id)} style={{ ...styles.dispBtn, ...(o.pago ? styles.dispBtnOn : styles.dispBtnOff) }}>{o.pago ? "Pago" : "Pendente"}</button>
+              </div>
+            </div>
+            <div style={styles.orderRow}><MapPin size={13} color="#8C7B52" /><span>{o.endereco} — {o.bairro}</span></div>
+            <pre style={styles.orderItems}>{o.itens}</pre>
+            {o.obsGeral && <p style={styles.orderObs}>Obs: {o.obsGeral}</p>}
+            <div style={styles.orderRow}><span style={{ fontWeight: 700, color: "#171310" }}>{o.pagamento}</span><span style={{ marginLeft: "auto", fontWeight: 800, color: "#E1231B" }}>{money(o.total)}</span></div>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button style={styles.smallBtnPrimary} onClick={() => advanceStatus(o.id)} disabled={o.status === "Entregue"}><Check size={13} color="#FFFBEF" /> Avançar status</button>
+              <button style={o.impresso ? styles.smallBtnDone : styles.smallBtnOutline} onClick={() => markPrinted(o.id)}><Printer size={13} color={o.impresso ? "#FFFBEF" : "#171310"} /> {o.impresso ? "Impresso" : "Imprimir"}</button>
+            </div>
+          </div>
+        ))}
+        {orders.length === 0 && <p style={{ color: "#6B5A3A", fontSize: 13 }}>Nenhum pedido ainda.</p>}
+      </div>
+    </div>
+  );
+}
+
+function NovoPedidoTab({ allItems, menuByCategory, onCriar }) {
+  const [cart, setCart] = useState([]);
+  const [modalItem, setModalItem] = useState(null);
+  const [cliente, setCliente] = useState("");
+  const [rua, setRua] = useState("");
+  const [numero, setNumero] = useState("");
+  const [bairro, setBairro] = useState(NEIGHBORHOODS[0].name);
+  const [obs, setObs] = useState("");
+  const [paymentIds, setPaymentIds] = useState(["pix"]);
+  const [troco, setTroco] = useState("");
+  const categorias = Object.keys(menuByCategory);
+  const [tabCat, setTabCat] = useState(categorias[0] || "Lanches");
+
+  function addLine(itemId, addonIds, notes, qty) {
+    const key = lineKey(itemId, addonIds, notes);
+    setCart((c) => {
+      const existing = c.find((l) => l.key === key);
+      if (existing) return c.map((l) => (l.key === key ? { ...l, qty: l.qty + qty } : l));
+      return [...c, { key, itemId, addonIds, notes, qty }];
+    });
+  }
+  function inc(key) { setCart((c) => c.map((l) => (l.key === key ? { ...l, qty: l.qty + 1 } : l))); }
+  function dec(key) { setCart((c) => c.map((l) => (l.key === key ? { ...l, qty: l.qty - 1 } : l)).filter((l) => l.qty > 0)); }
+  function togglePayment(id) { setPaymentIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= 2 ? p : [...p, id])); }
+
+  const subtotal = cart.reduce((s, l) => s + unitPrice(allItems[l.itemId], l.addonIds) * l.qty, 0);
+  const fee = NEIGHBORHOODS.find((n) => n.name === bairro)?.fee ?? 0;
+  const total = subtotal + (cart.length ? fee : 0);
+  const formaLabel = paymentIds.map((id) => PAYMENT_METHODS.find((p) => p.id === id)?.label).join(" + ") + (paymentIds.includes("dinheiro") && troco ? " (troco p/ " + troco + ")" : "");
+
+  function finalizar() {
+    if (!cart.length) return;
+    const itensTexto = cart.map((l) => {
+      const item = allItems[l.itemId];
+      const addons = addonsById(l.addonIds).map((a) => a.name).join(", ");
+      return l.qty + "x " + item.name + (addons ? " (+ " + addons + ")" : "");
+    }).join("\n");
+    onCriar({ cliente: cliente || "Cliente balcão", bairro, endereco: (rua || "Rua não informada") + (numero ? ", " + numero : ""), itens: itensTexto, obsGeral: obs, pagamento: formaLabel || "A definir", formaChave: paymentIds[0] || "pix", total, origem: "balcao" });
+    setCart([]); setCliente(""); setRua(""); setNumero(""); setObs(""); setPaymentIds(["pix"]); setTroco("");
+  }
+
+  const itensAba = (menuByCategory[tabCat] || []).filter((i) => i.available !== false);
+
+  return (
+    <div>
+      <TabHeader title="Novo pedido (delivery)" subtitle="Para pedidos recebidos por telefone ou WhatsApp — funciona como o app do cliente" />
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 320px" }}>
+          <div style={styles.tabRow}>{categorias.map((cat) => (<button key={cat} onClick={() => setTabCat(cat)} style={{ ...styles.tabBtnAdm, ...(tabCat === cat ? styles.tabBtnAdmActive : {}) }}>{cat}</button>))}</div>
+          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+            {itensAba.map((item) => (
+              <div key={item.id} style={styles.menuPickRow}>
+                <div style={{ flex: 1 }}><p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#171310" }}>{item.name}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: "#6B5A3A" }}>{money(item.price)}</p></div>
+                <button style={styles.smallBtnPrimary} onClick={() => (tabCat === "Lanches" ? setModalItem(item) : addLine(item.id, [], "", 1))}><Plus size={13} color="#FFFBEF" /> Adicionar</button>
+              </div>
+            ))}
+          </div>
+          {cart.length > 0 && (
+            <div style={{ marginTop: 18 }}>
+              <p style={styles.formLabel}>ITENS DO PEDIDO</p>
+              {cart.map((l) => {
+                const item = allItems[l.itemId]; const addons = addonsById(l.addonIds);
+                return (
+                  <div key={l.key} style={styles.menuPickRow}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#171310" }}>{item.name}</p>
+                      {addons.length > 0 && <p style={{ margin: 0, fontSize: 10.5, color: "#6B5A3A" }}>+ {addons.map((a) => a.name).join(", ")}</p>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <button style={styles.qtyBtnAdm} onClick={() => dec(l.key)}><Minus size={12} color="#171310" /></button>
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>{l.qty}</span>
+                      <button style={styles.qtyBtnAdmFilled} onClick={() => inc(l.key)}><Plus size={12} color="#FFFBEF" /></button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div style={{ flex: "1 1 280px", maxWidth: 340 }}>
+          <div style={styles.formCard}>
+            <p style={styles.formLabel}>NOME DO CLIENTE</p>
+            <input value={cliente} onChange={(e) => setCliente(e.target.value)} style={styles.formInput} placeholder="Nome" />
+            <p style={styles.formLabel}>RUA</p>
+            <input value={rua} onChange={(e) => setRua(e.target.value)} style={styles.formInput} placeholder="Rua / Avenida" />
+            <p style={styles.formLabel}>NÚMERO</p>
+            <input value={numero} onChange={(e) => setNumero(e.target.value)} style={styles.formInput} placeholder="Número" />
+            <p style={styles.formLabel}>BAIRRO</p>
+            <select value={bairro} onChange={(e) => setBairro(e.target.value)} style={styles.formInput}>{NEIGHBORHOODS.map((n) => <option key={n.name} value={n.name}>{n.name} · {money(n.fee)}</option>)}</select>
+            <p style={styles.formLabel}>OBSERVAÇÃO</p>
+            <input value={obs} onChange={(e) => setObs(e.target.value)} style={styles.formInput} placeholder="Ponto de referência, etc." />
+            <p style={styles.formLabel}>PAGAMENTO</p>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{PAYMENT_METHODS.map((p) => { const active = paymentIds.includes(p.id); return (<button key={p.id} onClick={() => togglePayment(p.id)} style={{ ...styles.paymentChip, ...(active ? styles.paymentChipActive : {}) }}>{p.label}</button>); })}</div>
+            {paymentIds.includes("dinheiro") && <input value={troco} onChange={(e) => setTroco(e.target.value)} style={{ ...styles.formInput, marginTop: 8 }} placeholder="Troco para quanto?" />}
+            <div style={{ marginTop: 14, borderTop: "1px solid rgba(23,19,16,0.1)", paddingTop: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6B5A3A" }}><span>Subtotal</span><span>{money(subtotal)}</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6B5A3A" }}><span>Entrega</span><span>{money(cart.length ? fee : 0)}</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800, color: "#171310", marginTop: 4 }}><span>Total</span><span style={{ color: "#E1231B" }}>{money(total)}</span></div>
+            </div>
+            <button style={{ ...styles.smallBtnPrimary, width: "100%", justifyContent: "center", marginTop: 12, padding: "10px 0" }} onClick={finalizar} disabled={!cart.length}><Send size={14} color="#FFFBEF" /> Criar pedido e enviar pra impressão</button>
+          </div>
+        </div>
+      </div>
+      {modalItem && <AddonModalAdm item={modalItem} onClose={() => setModalItem(null)} onConfirm={(addonIds, notes, qty) => { addLine(modalItem.id, addonIds, notes, qty); setModalItem(null); }} />}
+    </div>
+  );
+}
+
+function MesasTab({ mesas, allItems, menuByCategory, onAbrir, onAddLine, onEnviar, onFechar, onUpdateMesa }) {
+  const [selecionadaId, setSelecionadaId] = useState(null);
+  const [modalItem, setModalItem] = useState(null);
+  const [closing, setClosing] = useState(false);
+  const categorias = Object.keys(menuByCategory);
+  const [tabCat, setTabCat] = useState(categorias[0] || "Lanches");
+  const ocupadas = mesas.filter((m) => m.status === "ocupada").length;
+  const mesa = mesas.find((m) => m.id === selecionadaId);
+  const totalMesa = mesa ? [...mesa.enviados, ...mesa.cart].reduce((s, l) => s + unitPrice(allItems[l.itemId], l.addonIds) * l.qty, 0) : 0;
+  const itensAba = (menuByCategory[tabCat] || []).filter((i) => i.available !== false);
+
+  async function abrirOuSelecionar(id) {
+    const m = mesas.find((x) => x.id === id);
+    if (m.status === "livre") await onAbrir(id);
+    setSelecionadaId(id);
+  }
+
+  return (
+    <div>
+      <TabHeader title="Mesas" subtitle={"Faça pedidos e feche mesas direto por aqui — " + ocupadas + "/" + mesas.length + " ocupadas (sincronizado com o app do garçom)"} />
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div style={styles.mesasGrid}>
+          {mesas.map((m) => {
+            const livre = m.status === "livre";
+            return (
+              <button key={m.id} onClick={() => abrirOuSelecionar(m.id)} style={{ ...styles.mesaTile, background: livre ? "#E9FBF0" : "#FFECEB", border: livre ? "1px solid #2ECC71" : "1px solid #FF3B30" }}>
+                <span style={{ fontSize: 15, fontWeight: 800, color: livre ? "#1E8449" : "#C0392B" }}>{m.id}</span>
+                <span style={{ fontSize: 8.5, fontWeight: 700, color: livre ? "#1E8449" : "#C0392B" }}>{livre ? "LIVRE" : "OCUPADA"}</span>
+              </button>
+            );
+          })}
+        </div>
+        {mesa && (
+          <div style={styles.mesaWorkspace}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <p style={{ margin: 0, fontFamily: "Anton, sans-serif", fontSize: 16, color: "#171310" }}>MESA {mesa.id}</p>
+              <button onClick={() => setSelecionadaId(null)} style={styles.modalCloseBtnAdm}><X size={13} color="#FFFBEF" /></button>
+            </div>
+            <input value={mesa.clienteNome} onChange={(e) => onUpdateMesa(mesa.id, { clienteNome: e.target.value })} placeholder="Nome do cliente (opcional)" style={{ ...styles.formInput, marginTop: 10 }} />
+            <div style={{ ...styles.tabRow, marginTop: 12 }}>{categorias.map((cat) => (<button key={cat} onClick={() => setTabCat(cat)} style={{ ...styles.tabBtnAdm, ...(tabCat === cat ? styles.tabBtnAdmActive : {}) }}>{cat}</button>))}</div>
+            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto" }}>
+              {itensAba.map((item) => (
+                <div key={item.id} style={styles.menuPickRow}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: "#171310" }}>{item.name}</span>
+                  <button style={styles.qtyBtnAdmFilled} onClick={() => (tabCat === "Lanches" ? setModalItem(item) : onAddLine(mesa.id, item.id, [], "", 1))}><Plus size={12} color="#FFFBEF" /></button>
+                </div>
+              ))}
+            </div>
+            {mesa.enviados.length > 0 && (<div style={{ marginTop: 12 }}><p style={styles.formLabel}>JÁ ENVIADO À COZINHA</p>{mesa.enviados.map((l, idx) => (<p key={idx} style={{ margin: "2px 0", fontSize: 11.5, color: "#6B5A3A" }}>{l.qty}x {allItems[l.itemId]?.name}</p>))}</div>)}
+            {mesa.cart.length > 0 && (<div style={{ marginTop: 10 }}><p style={styles.formLabel}>AINDA NÃO ENVIADO</p>{mesa.cart.map((l) => (<p key={l.key} style={{ margin: "2px 0", fontSize: 11.5, color: "#171310", fontWeight: 600 }}>{l.qty}x {allItems[l.itemId]?.name}</p>))}</div>)}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, borderTop: "1px solid rgba(23,19,16,0.1)", paddingTop: 8 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: "#171310" }}>Total da mesa</span><span style={{ fontSize: 14, fontWeight: 800, color: "#E1231B" }}>{money(totalMesa)}</span>
+            </div>
+            <button style={{ ...styles.smallBtnPrimary, width: "100%", justifyContent: "center", marginTop: 10, opacity: mesa.cart.length ? 1 : 0.4 }} disabled={!mesa.cart.length} onClick={() => onEnviar(mesa.id)}><Send size={13} color="#FFFBEF" /> Enviar para a cozinha</button>
+            <button style={{ ...styles.smallBtnOutline, width: "100%", justifyContent: "center", marginTop: 8 }} onClick={() => setClosing(true)}><Printer size={13} color="#171310" /> Fechar mesa / pagamento</button>
+          </div>
+        )}
+      </div>
+      {modalItem && <AddonModalAdm item={modalItem} onClose={() => setModalItem(null)} onConfirm={(addonIds, notes, qty) => { onAddLine(mesa.id, modalItem.id, addonIds, notes, qty); setModalItem(null); }} />}
+      {closing && mesa && <FecharMesaModalAdm total={totalMesa} onClose={() => setClosing(false)} onConfirm={(paymentIds, troco) => { onFechar(mesa.id, paymentIds, troco, totalMesa); setClosing(false); setSelecionadaId(null); }} />}
+    </div>
+  );
+}
+
+function AddonModalAdm({ item, onClose, onConfirm }) {
+  const [selected, setSelected] = useState([]);
+  const [notes, setNotes] = useState("");
+  const [qty, setQty] = useState(1);
+  function toggle(id) { setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])); }
+  const total = unitPrice(item, selected) * qty;
+  return (
+    <div style={styles.modalBackdropAdm} onClick={onClose}>
+      <div style={styles.modalCardAdm} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div><p style={{ margin: 0, fontWeight: 800, color: "#171310" }}>{item.name}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: "#6B5A3A" }}>{item.desc}</p></div>
+          <button onClick={onClose} style={styles.modalCloseBtnAdm}><X size={13} color="#FFFBEF" /></button>
+        </div>
+        <p style={styles.formLabel}>ADICIONAIS</p>
+        {ADDONS.map((a) => { const active = selected.includes(a.id); return (<button key={a.id} onClick={() => toggle(a.id)} style={{ ...styles.optionRowAdm, ...(active ? styles.optionRowAdmActive : {}) }}><span style={{ fontSize: 12.5, color: "#171310", fontWeight: 600 }}>+ {a.name}</span><span style={{ fontSize: 12, color: "#E1231B", fontWeight: 800 }}>{money(a.price)}</span></button>); })}
+        <p style={styles.formLabel}>RETIRAR INGREDIENTE?</p>
+        <input value={notes} onChange={(e) => setNotes(e.target.value)} style={styles.formInput} placeholder="Ex: sem cebola" />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 700 }}>Quantidade</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button style={styles.qtyBtnAdm} onClick={() => setQty((q) => Math.max(1, q - 1))}><Minus size={12} color="#171310" /></button>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>{qty}</span>
+            <button style={styles.qtyBtnAdmFilled} onClick={() => setQty((q) => q + 1)}><Plus size={12} color="#FFFBEF" /></button>
+          </div>
+        </div>
+        <button style={{ ...styles.smallBtnPrimary, width: "100%", justifyContent: "center", marginTop: 12 }} onClick={() => onConfirm(selected, notes, qty)}>Adicionar · {money(total)}</button>
+      </div>
+    </div>
+  );
+}
+
+function FecharMesaModalAdm({ total, onClose, onConfirm }) {
+  const [paymentIds, setPaymentIds] = useState(["pix"]);
+  const [troco, setTroco] = useState("");
+  const [dividir, setDividir] = useState(false);
+  const [partes, setPartes] = useState(["", ""]);
+  const [step, setStep] = useState("form");
+  function toggle(id) { setPaymentIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= 2 ? p : [...p, id])); }
+  function updateParte(i, v) { setPartes((p) => p.map((x, idx) => (idx === i ? v : x))); }
+  function addParte() { setPartes((p) => [...p, ""]); }
+  function removeParte(i) { setPartes((p) => p.filter((_, idx) => idx !== i)); }
+  const somaPartes = partes.reduce((s, v) => s + (parseFloat(v.replace(",", ".")) || 0), 0);
+
+  if (step === "confirm") {
+    return (
+      <div style={styles.modalBackdropAdm} onClick={onClose}>
+        <div style={styles.modalCardAdm} onClick={(e) => e.stopPropagation()}>
+          <p style={{ margin: 0, fontWeight: 800, color: "#171310", textAlign: "center" }}>Confirmar pagamento</p>
+          <p style={{ fontSize: 13, color: "#6B5A3A", textAlign: "center", marginTop: 10 }}>O pagamento de <b style={{ color: "#171310" }}>{money(total)}</b> foi realizado pelo cliente?</p>
+          <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+            <button style={styles.confirmNoBtnAdm} onClick={() => setStep("form")}>NÃO</button>
+            <button style={styles.confirmYesBtnAdm} onClick={() => onConfirm(paymentIds, troco)}>SIM</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={styles.modalBackdropAdm} onClick={onClose}>
+      <div style={styles.modalCardAdm} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <p style={{ margin: 0, fontWeight: 800, color: "#171310" }}>Fechar mesa</p>
+          <button onClick={onClose} style={styles.modalCloseBtnAdm}><X size={13} color="#FFFBEF" /></button>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+          <p style={{ margin: 0, ...styles.formLabel }}>DIVIDIR A CONTA?</p>
+          <button onClick={() => setDividir((d) => !d)} style={{ ...styles.dispBtn, ...(dividir ? styles.dispBtnOn : styles.dispBtnOff) }}>{dividir ? "Sim" : "Não"}</button>
+        </div>
+        {dividir && (
+          <div style={{ marginTop: 6 }}>
+            {partes.map((v, i) => (
+              <div key={i} style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                <input value={v} onChange={(e) => updateParte(i, e.target.value)} placeholder={"Parte " + (i + 1) + " (R$)"} style={styles.formInput} />
+                {partes.length > 1 && <button onClick={() => removeParte(i)} style={styles.qtyBtnAdm}><X size={11} color="#171310" /></button>}
+              </div>
+            ))}
+            <button onClick={addParte} style={{ fontSize: 11.5, fontWeight: 700, color: "#E1231B" }}>+ Adicionar parte</button>
+            <p style={{ fontSize: 10.5, color: somaPartes.toFixed(2) === total.toFixed(2) ? "#1E8449" : "#C0392B", marginTop: 4 }}>Soma das partes: {money(somaPartes)} {somaPartes.toFixed(2) !== total.toFixed(2) ? "(o total da mesa é " + money(total) + ")" : "✓"}</p>
+          </div>
+        )}
+        <p style={styles.formLabel}>FORMA DE PAGAMENTO</p>
+        <div style={{ display: "flex", gap: 6 }}>{PAYMENT_METHODS.map((p) => (<button key={p.id} onClick={() => toggle(p.id)} style={{ ...styles.paymentChip, ...(paymentIds.includes(p.id) ? styles.paymentChipActive : {}) }}>{p.label}</button>))}</div>
+        {paymentIds.includes("dinheiro") && <input value={troco} onChange={(e) => setTroco(e.target.value)} style={{ ...styles.formInput, marginTop: 8 }} placeholder="Troco para quanto?" />}
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14 }}><span style={{ fontWeight: 800, color: "#171310" }}>Total</span><span style={{ fontWeight: 800, color: "#E1231B", fontSize: 16 }}>{money(total)}</span></div>
+        <button style={{ ...styles.smallBtnPrimary, width: "100%", justifyContent: "center", marginTop: 12 }} onClick={() => setStep("confirm")}><Printer size={13} color="#FFFBEF" /> Confirmar e imprimir conta</button>
+      </div>
+    </div>
+  );
+}
+
+function ClientesTab({ customers, onUpdatePontos }) {
+  const [query, setQuery] = useState("");
+  const filtered = customers.filter((c) => (c.nome || "").toLowerCase().includes(query.toLowerCase()));
+  return (
+    <div>
+      <TabHeader title="Clientes" subtitle="Cadastro vem automaticamente do app do cliente — ajuste os pontos de fidelidade se precisar" />
+      <div style={styles.searchWrap}><Search size={15} color="#8C7B52" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar cliente pelo nome" style={styles.searchInput} /></div>
+      <div style={styles.customerList}>
+        {filtered.map((c) => (
+          <div key={c.id} style={styles.customerCard}>
+            <div style={styles.customerAvatar}>{(c.nome || "?").split(" ").map((p) => p[0]).slice(0, 2).join("")}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={styles.customerName}>{c.nome}</p>
+              <p style={styles.customerMeta}>{c.whatsapp} · {c.bairro}</p>
+            </div>
+            <div style={styles.pointsEditWrap}>
+              <Star size={12} color="#171310" fill="#171310" />
+              <input defaultValue={c.pontos || 0} onBlur={(e) => onUpdatePontos(c.id, parseInt(e.target.value, 10) || 0)} style={styles.pointsEditInput} inputMode="numeric" />
+              <span style={{ fontSize: 10.5, color: "#171310", fontWeight: 700 }}>pts</span>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && <p style={{ color: "#6B5A3A", fontSize: 13 }}>Nenhum cliente cadastrado ainda.</p>}
+      </div>
+    </div>
+  );
+}
+
+function PromocaoTab({ promo, onSalvar }) {
+  const [name, setName] = useState(promo.name || "");
+  const [price, setPrice] = useState(String(promo.price || 0).replace(".", ","));
+  const [imageUrl, setImageUrl] = useState(promo.imageUrl || "");
+  useEffect(() => { setName(promo.name || ""); setPrice(String(promo.price || 0).replace(".", ",")); setImageUrl(promo.imageUrl || ""); }, [promo.name]);
+  function salvar() {
+    const numeric = parseFloat(price.replace(",", "."));
+    onSalvar({ name: name.trim() || promo.name, price: isNaN(numeric) ? promo.price : numeric, imageUrl: imageUrl.trim() });
+  }
+  return (
+    <div>
+      <TabHeader title="Promoção do dia" subtitle="O que você salvar aqui aparece na hora no app dos clientes" />
+      <div style={styles.formCard}>
+        <label style={styles.formLabel}>Foto da promoção (link da imagem)</label>
+        <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} style={styles.formInput} placeholder="Cole aqui o link de uma foto, ou deixe em branco" />
+        <label style={styles.formLabel}>Nome da promoção</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} style={styles.formInput} />
+        <label style={styles.formLabel}>Valor (R$)</label>
+        <input value={price} onChange={(e) => setPrice(e.target.value)} style={styles.formInput} inputMode="decimal" />
+        <button style={styles.smallBtnPrimary} onClick={salvar}><Check size={13} color="#FFFBEF" /> Salvar promoção</button>
+      </div>
+    </div>
+  );
+}
+
+function CardapioTab({ produtos, onUpdate }) {
+  function updatePrice(id, value) { const numeric = parseFloat(value.replace(",", ".")); if (!isNaN(numeric)) onUpdate(id, { price: numeric }); }
+  function toggleDisponivel(id, atual) { onUpdate(id, { available: !atual }); }
+  const cats = {};
+  produtos.forEach((p) => { if (!cats[p.category]) cats[p.category] = []; cats[p.category].push(p); });
+  return (
+    <div>
+      <TabHeader title="Cardápio" subtitle="Ajuste preços e disponibilidade — reflete no app do cliente, no garçom e nos pedidos criados por aqui" />
+      {Object.entries(cats).map(([cat, items]) => (
+        <div key={cat} style={{ marginBottom: 18 }}>
+          <p style={{ fontSize: 12, fontWeight: 800, color: "#171310", marginBottom: 8 }}>{cat}</p>
+          <div style={styles.menuTable}>
+            {items.map((item) => (
+              <div key={item.id} style={styles.menuRow}>
+                <span style={{ ...styles.menuRowName, opacity: item.available !== false ? 1 : 0.4, textDecoration: item.available !== false ? "none" : "line-through" }}>{item.name}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={styles.menuRowPriceWrap}><span style={{ color: "#6B5A3A", fontSize: 12 }}>R$</span><input defaultValue={String(item.price).replace(".", ",")} onBlur={(e) => updatePrice(item.id, e.target.value)} style={styles.menuRowInput} /></div>
+                  <button onClick={() => toggleDisponivel(item.id, item.available !== false)} style={{ ...styles.dispBtn, ...(item.available !== false ? styles.dispBtnOn : styles.dispBtnOff) }}>{item.available !== false ? "Disponível" : "Indisponível"}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FidelidadeTab({ loyalty, onSalvar }) {
+  const [pontosPorReal, setPontosPorReal] = useState(String(loyalty.pontosPorReal || 1));
+  const [pontosParaBrinde, setPontosParaBrinde] = useState(String(loyalty.pontosParaBrinde || 500));
+  const [nomeBrinde, setNomeBrinde] = useState(loyalty.nomeBrinde || "");
+  useEffect(() => { setPontosPorReal(String(loyalty.pontosPorReal || 1)); setPontosParaBrinde(String(loyalty.pontosParaBrinde || 500)); setNomeBrinde(loyalty.nomeBrinde || ""); }, [loyalty.nomeBrinde]);
+  function salvar() {
+    const ppr = parseFloat(pontosPorReal.replace(",", ".")); const ppb = parseInt(pontosParaBrinde, 10);
+    onSalvar({ pontosPorReal: isNaN(ppr) ? loyalty.pontosPorReal : ppr, pontosParaBrinde: isNaN(ppb) ? loyalty.pontosParaBrinde : ppb, nomeBrinde: nomeBrinde.trim() || loyalty.nomeBrinde });
+  }
+  return (
+    <div>
+      <TabHeader title="Programa de fidelidade" subtitle="Defina como os clientes acumulam pontos e o que ganham ao atingir a meta" />
+      <div style={styles.formCard}>
+        <label style={styles.formLabel}>Pontos ganhos a cada R$1 gasto</label>
+        <input value={pontosPorReal} onChange={(e) => setPontosPorReal(e.target.value)} style={styles.formInput} inputMode="decimal" />
+        <label style={styles.formLabel}>Pontos necessários para o brinde</label>
+        <input value={pontosParaBrinde} onChange={(e) => setPontosParaBrinde(e.target.value)} style={styles.formInput} inputMode="numeric" />
+        <label style={styles.formLabel}>O que o cliente ganha</label>
+        <input value={nomeBrinde} onChange={(e) => setNomeBrinde(e.target.value)} style={styles.formInput} placeholder="Ex: 1 lanche grátis" />
+        <button style={{ ...styles.smallBtnPrimary, marginTop: 12 }} onClick={salvar}><Check size={13} color="#FFFBEF" /> Salvar programa de fidelidade</button>
+      </div>
+    </div>
+  );
+}
+
+function CaixaTab({ transacoes }) {
+  const porForma = { pix: 0, cartao: 0, dinheiro: 0 };
+  transacoes.forEach((t) => { porForma[t.forma] = (porForma[t.forma] || 0) + t.valor; });
+  const totalGeral = porForma.pix + porForma.cartao + porForma.dinheiro;
+  const cards = [{ id: "pix", label: "Pix", valor: porForma.pix }, { id: "cartao", label: "Cartão", valor: porForma.cartao }, { id: "dinheiro", label: "Dinheiro", valor: porForma.dinheiro }];
+  return (
+    <div>
+      <TabHeader title="Fechamento de caixa" subtitle="Totais recebidos, somando pedidos do app, balcão e mesas — em tempo real" />
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+        {cards.map((c) => (<div key={c.id} style={styles.caixaCard}><Wallet size={16} color="#E1231B" /><p style={{ margin: "8px 0 0", fontSize: 11, color: "#6B5A3A", fontWeight: 700 }}>{c.label}</p><p style={{ margin: "2px 0 0", fontSize: 20, fontWeight: 800, color: "#171310" }}>{money(c.valor)}</p></div>))}
+        <div style={{ ...styles.caixaCard, background: "#171310" }}><Wallet size={16} color="#FFC907" /><p style={{ margin: "8px 0 0", fontSize: 11, color: "#B8A876", fontWeight: 700 }}>Total geral</p><p style={{ margin: "2px 0 0", fontSize: 20, fontWeight: 800, color: "#FFC907" }}>{money(totalGeral)}</p></div>
+      </div>
+      <p style={{ fontSize: 11, letterSpacing: 0.5, fontWeight: 800, color: "#E1231B", marginBottom: 8 }}>MOVIMENTAÇÕES</p>
+      <div style={styles.menuTable}>
+        {transacoes.map((t) => (
+          <div key={t.id} style={styles.menuRow}>
+            <div><span style={{ fontSize: 12.5, fontWeight: 600, color: "#171310" }}>{t.origem}</span><span style={{ display: "block", fontSize: 10.5, color: "#8C7B52" }}>{t.hora} · {t.forma === "pix" ? "Pix" : t.forma === "cartao" ? "Cartão" : "Dinheiro"}</span></div>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#171310" }}>{money(t.valor)}</span>
+          </div>
+        ))}
+        {transacoes.length === 0 && <p style={{ padding: 16, color: "#6B5A3A", fontSize: 13 }}>Nenhuma movimentação ainda.</p>}
+      </div>
+    </div>
+  );
+}
+
+const styles = {
+  page: { minHeight: "100vh", background: "#0F0D0A", fontFamily: "'Rubik', sans-serif" },
+  shell: { display: "flex", minHeight: "100vh" },
+  sidebar: { width: 220, background: "#171310", display: "flex", flexDirection: "column", padding: "20px 14px", flexShrink: 0 },
+  sidebarLogo: { display: "flex", alignItems: "center", gap: 8, padding: "0 8px" },
+  sidebarLogoText: { fontFamily: "Anton, sans-serif", color: "#FFC907", fontSize: 16, letterSpacing: 0.5 },
+  sidebarItem: { display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 10px", borderRadius: 10, color: "#B8A876", fontSize: 12.5, fontWeight: 600, marginBottom: 4, textAlign: "left" },
+  sidebarItemActive: { background: "rgba(255,201,7,0.12)", color: "#FFC907" },
+  sidebarBadge: { marginLeft: "auto", background: "#E1231B", color: "#FFFBEF", fontSize: 10, fontWeight: 700, borderRadius: 8, padding: "1px 6px" },
+  sidebarLogout: { display: "flex", alignItems: "center", gap: 8, padding: "10px", color: "#B8A876", fontSize: 13, fontWeight: 600 },
+  content: { flex: 1, background: "#FFFBEF", padding: "28px 32px", overflowY: "auto" },
+  tabTitle: { fontFamily: "Anton, sans-serif", fontSize: 22, color: "#171310", margin: 0, letterSpacing: 0.3 },
+  tabSubtitle: { fontSize: 12.5, color: "#6B5A3A", margin: "4px 0 0" },
+  ordersGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 },
+  orderCard: { background: "#FFFFFF", border: "1px solid rgba(23,19,16,0.1)", borderRadius: 14, padding: 14 },
+  orderId: { margin: 0, fontSize: 11, color: "#8C7B52", fontWeight: 700 },
+  orderCustomer: { margin: "2px 0 0", fontSize: 14, fontWeight: 800, color: "#171310" },
+  statusChip: { fontSize: 10.5, fontWeight: 700, color: "#171310", background: "#FFEFC0", borderRadius: 8, padding: "3px 8px", height: "fit-content" },
+  orderRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, color: "#4A3A1F" },
+  orderItems: { fontFamily: "'Rubik', sans-serif", whiteSpace: "pre-wrap", fontSize: 12, color: "#171310", background: "#FFF3C0", borderRadius: 8, padding: "8px 10px", margin: "8px 0 0" },
+  orderObs: { fontSize: 11, color: "#E1231B", fontStyle: "italic", margin: "6px 0 0" },
+  smallBtnPrimary: { display: "flex", alignItems: "center", gap: 6, background: "#171310", color: "#FFFBEF", fontSize: 11.5, fontWeight: 700, padding: "8px 10px", borderRadius: 9 },
+  smallBtnOutline: { display: "flex", alignItems: "center", gap: 6, background: "#FFFBEF", border: "1px solid rgba(23,19,16,0.2)", color: "#171310", fontSize: 11.5, fontWeight: 700, padding: "8px 10px", borderRadius: 9 },
+  smallBtnDone: { display: "flex", alignItems: "center", gap: 6, background: "#8C7B52", color: "#FFFBEF", fontSize: 11.5, fontWeight: 700, padding: "8px 10px", borderRadius: 9 },
+  searchWrap: { display: "flex", alignItems: "center", gap: 8, background: "#FFFFFF", border: "1px solid rgba(23,19,16,0.12)", borderRadius: 10, padding: "8px 12px", maxWidth: 320, marginBottom: 16 },
+  searchInput: { border: "none", outline: "none", fontSize: 13, flex: 1, color: "#171310", background: "transparent" },
+  customerList: { display: "flex", flexDirection: "column", gap: 10 },
+  customerCard: { display: "flex", alignItems: "center", gap: 12, background: "#FFFFFF", border: "1px solid rgba(23,19,16,0.1)", borderRadius: 14, padding: 14 },
+  customerAvatar: { width: 40, height: 40, borderRadius: "50%", background: "#E1231B", color: "#FFFBEF", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, flexShrink: 0 },
+  customerName: { margin: 0, fontSize: 14, fontWeight: 800, color: "#171310" },
+  customerMeta: { margin: "2px 0 0", fontSize: 11.5, color: "#6B5A3A" },
+  formCard: { background: "#FFFFFF", border: "1px solid rgba(23,19,16,0.1)", borderRadius: 14, padding: 18, maxWidth: 380 },
+  formLabel: { display: "block", fontSize: 10.5, letterSpacing: 0.5, fontWeight: 800, color: "#E1231B", marginTop: 10, marginBottom: 5 },
+  formInput: { width: "100%", background: "#FFFBEF", border: "1px solid rgba(23,19,16,0.15)", borderRadius: 9, padding: "9px 11px", fontSize: 13, color: "#171310" },
+  menuTable: { background: "#FFFFFF", border: "1px solid rgba(23,19,16,0.1)", borderRadius: 14, overflow: "hidden", maxWidth: 460 },
+  menuRow: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(23,19,16,0.06)" },
+  menuRowName: { fontSize: 13, fontWeight: 600, color: "#171310" },
+  menuRowPriceWrap: { display: "flex", alignItems: "center", gap: 4, background: "#FFFBEF", border: "1px solid rgba(23,19,16,0.15)", borderRadius: 8, padding: "4px 8px" },
+  menuRowInput: { width: 60, border: "none", outline: "none", background: "transparent", fontSize: 13, fontWeight: 700, color: "#171310" },
+  dispBtn: { fontSize: 10.5, fontWeight: 700, borderRadius: 8, padding: "5px 10px" },
+  dispBtnOn: { background: "#E9FBF0", color: "#1E8449", border: "1px solid #2ECC71" },
+  dispBtnOff: { background: "#FFECEB", color: "#C0392B", border: "1px solid #FF3B30" },
+  mesasGrid: { display: "grid", gridTemplateColumns: "repeat(5, 60px)", gap: 10 },
+  mesaTile: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: 10, padding: "10px 0" },
+  mesaWorkspace: { width: 300, background: "#FFFFFF", border: "1px solid rgba(23,19,16,0.1)", borderRadius: 14, padding: 16, height: "fit-content" },
+  tabRow: { display: "flex", gap: 8, flexWrap: "wrap" },
+  tabBtnAdm: { padding: "6px 12px", borderRadius: 9, fontSize: 11.5, fontWeight: 700, color: "#171310", background: "#FFFBEF", border: "1px solid rgba(23,19,16,0.1)" },
+  tabBtnAdmActive: { background: "#171310", color: "#FFC907" },
+  menuPickRow: { display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FFFFFF", border: "1px solid rgba(23,19,16,0.08)", borderRadius: 10, padding: "8px 10px" },
+  qtyBtnAdm: { width: 22, height: 22, borderRadius: 6, background: "#FFEFC0", display: "flex", alignItems: "center", justifyContent: "center" },
+  qtyBtnAdmFilled: { width: 22, height: 22, borderRadius: 6, background: "#E1231B", display: "flex", alignItems: "center", justifyContent: "center" },
+  paymentChip: { padding: "7px 12px", borderRadius: 9, fontSize: 11.5, fontWeight: 700, color: "#171310", background: "#FFFBEF", border: "1px solid rgba(23,19,16,0.15)" },
+  paymentChipActive: { background: "#171310", color: "#FFC907", border: "1px solid #171310" },
+  modalBackdropAdm: { position: "fixed", inset: 0, background: "rgba(23,19,16,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 },
+  modalCardAdm: { width: 340, background: "#FFFFFF", borderRadius: 16, padding: 18, maxHeight: "85vh", overflowY: "auto" },
+  optionRowAdm: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "#FFFBEF", border: "1px solid rgba(23,19,16,0.1)", borderRadius: 9, padding: "8px 10px", width: "100%", marginBottom: 6 },
+  optionRowAdmActive: { border: "1px solid #E1231B", background: "#FFF3C0" },
+  modalCloseBtnAdm: { width: 22, height: 22, borderRadius: 7, background: "#171310", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  caixaCard: { background: "#FFFFFF", border: "1px solid rgba(23,19,16,0.1)", borderRadius: 14, padding: 16, width: 150 },
+  confirmNoBtnAdm: { flex: 1, background: "#FF3B30", color: "#FFFFFF", fontWeight: 800, fontSize: 13, padding: "12px 0", borderRadius: 10 },
+  confirmYesBtnAdm: { flex: 1, background: "#2ECC71", color: "#0A2E1A", fontWeight: 800, fontSize: 13, padding: "12px 0", borderRadius: 10 },
+  pointsEditWrap: { display: "flex", alignItems: "center", gap: 4, background: "#FFC907", borderRadius: 9, padding: "6px 8px", flexShrink: 0 },
+  pointsEditInput: { width: 44, border: "none", outline: "none", background: "transparent", fontSize: 12, fontWeight: 800, color: "#171310", textAlign: "right" },
+  removeStaffBtn: { width: 30, height: 30, borderRadius: 9, background: "#FFECEB", border: "1px solid rgba(192,57,43,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  loginPage: { minHeight: "100vh", background: "#171310", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Rubik', sans-serif", padding: 20 },
+  loginCard: { width: 340, background: "#FFC907", borderRadius: 20, padding: "32px 26px", textAlign: "center" },
+  loginLogo: { width: 52, height: 52, borderRadius: "50%", background: "#171310", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto" },
+  loginTitle: { fontFamily: "Anton, sans-serif", fontSize: 20, color: "#171310", margin: "14px 0 0", letterSpacing: 0.5 },
+  loginSubtitle: { fontSize: 12, color: "#4A3A1F", margin: "4px 0 22px" },
+  loginLabel: { display: "block", textAlign: "left", fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, color: "#171310", margin: "0 0 5px" },
+  loginInputWrap: { display: "flex", alignItems: "center", gap: 8, background: "#FFFBEF", border: "1px solid rgba(23,19,16,0.15)", borderRadius: 10, padding: "10px 12px", marginBottom: 14 },
+  loginInput: { border: "none", outline: "none", background: "transparent", fontSize: 13, color: "#171310", flex: 1 },
+  loginBtn: { width: "100%", background: "linear-gradient(135deg, #E1231B, #171310)", color: "#FFC907", fontWeight: 800, fontSize: 13, letterSpacing: 0.5, padding: "13px 0", borderRadius: 12, marginTop: 6 },
+  loginNote: { fontSize: 10, color: "#4A3A1F", marginTop: 14, lineHeight: 1.4 },
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
